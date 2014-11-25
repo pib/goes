@@ -41,7 +41,7 @@ func (c *Connection) WithClient(cl *http.Client) *Connection {
 }
 
 // CreateIndex creates a new index represented by a name and a mapping
-func (c *Connection) CreateIndex(name string, mapping map[string]interface{}) (Response, error) {
+func (c *Connection) CreateIndex(name string, mapping map[string]interface{}) (*Response, error) {
 	r := Request{
 		Conn:      c,
 		Query:     mapping,
@@ -53,7 +53,7 @@ func (c *Connection) CreateIndex(name string, mapping map[string]interface{}) (R
 }
 
 // DeleteIndex deletes an index represented by a name
-func (c *Connection) DeleteIndex(name string) (Response, error) {
+func (c *Connection) DeleteIndex(name string) (*Response, error) {
 	r := Request{
 		Conn:      c,
 		IndexList: []string{name},
@@ -64,7 +64,7 @@ func (c *Connection) DeleteIndex(name string) (Response, error) {
 }
 
 // RefreshIndex refreshes an index represented by a name
-func (c *Connection) RefreshIndex(name string) (Response, error) {
+func (c *Connection) RefreshIndex(name string) (*Response, error) {
 	r := Request{
 		Conn:      c,
 		IndexList: []string{name},
@@ -76,7 +76,7 @@ func (c *Connection) RefreshIndex(name string) (Response, error) {
 }
 
 // Stats fetches statistics (_stats) for the current elasticsearch server
-func (c *Connection) Stats(indexList []string, extraArgs url.Values) (Response, error) {
+func (c *Connection) Stats(indexList []string, extraArgs url.Values) (*Response, error) {
 	r := Request{
 		Conn:      c,
 		IndexList: indexList,
@@ -88,9 +88,31 @@ func (c *Connection) Stats(indexList []string, extraArgs url.Values) (Response, 
 	return r.Run()
 }
 
+// Health fetches cluster health (_cluster/health)
+func (c *Connection) Health(extraArgs url.Values) (*HealthResponse, error) {
+	r := Request{
+		Conn:      c,
+		IndexList: []string{"health"},
+		ExtraArgs: extraArgs,
+		method:    "GET",
+		api:       "_cluster",
+	}
+
+	res := &HealthResponse{}
+	body, err := r.run()
+	if err != nil {
+		return res, err
+	}
+
+	if err = json.Unmarshal(body, res); err != nil {
+		return res, err
+	}
+	return res, nil
+}
+
 // IndexStatus fetches the status (_status) for the indices defined in
 // indexList. Use _all in indexList to get stats for all indices
-func (c *Connection) IndexStatus(indexList []string) (Response, error) {
+func (c *Connection) IndexStatus(indexList []string) (*Response, error) {
 	r := Request{
 		Conn:      c,
 		IndexList: indexList,
@@ -102,7 +124,7 @@ func (c *Connection) IndexStatus(indexList []string) (Response, error) {
 }
 
 // Bulk adds multiple documents in bulk mode
-func (c *Connection) BulkSend(documents []Document) (Response, error) {
+func (c *Connection) BulkSend(documents []Document) (*Response, error) {
 	// We do not generate a traditional JSON here (often a one liner)
 	// Elasticsearch expects one line of JSON per line (EOL = \n)
 	// plus an extra \n at the very end of the document
@@ -134,7 +156,7 @@ func (c *Connection) BulkSend(documents []Document) (Response, error) {
 		})
 
 		if err != nil {
-			return Response{}, err
+			return &Response{}, err
 		}
 
 		bulkData[i] = action
@@ -151,7 +173,7 @@ func (c *Connection) BulkSend(documents []Document) (Response, error) {
 					typeOfFields = typeOfFields.Elem()
 				}
 				if typeOfFields.Kind() != reflect.Struct {
-					return Response{}, fmt.Errorf("Document fields not in struct or map[string]interface{} format")
+					return &Response{}, fmt.Errorf("Document fields not in struct or map[string]interface{} format")
 				}
 				if typeOfFields.NumField() == 0 {
 					continue
@@ -160,7 +182,7 @@ func (c *Connection) BulkSend(documents []Document) (Response, error) {
 
 			sources, err := json.Marshal(doc.Fields)
 			if err != nil {
-				return Response{}, err
+				return &Response{}, err
 			}
 
 			bulkData[i] = sources
@@ -182,7 +204,7 @@ func (c *Connection) BulkSend(documents []Document) (Response, error) {
 }
 
 // Search executes a search query against an index
-func (c *Connection) Search(query map[string]interface{}, indexList []string, typeList []string, extraArgs url.Values) (Response, error) {
+func (c *Connection) Search(query map[string]interface{}, indexList []string, typeList []string, extraArgs url.Values) (*Response, error) {
 	r := Request{
 		Conn:      c,
 		Query:     query,
@@ -199,7 +221,7 @@ func (c *Connection) Search(query map[string]interface{}, indexList []string, ty
 //Query runs a query against an index using the provided http method.
 //This method can be used to execute a delete by query, just pass in "DELETE"
 //for the HTTP method.
-func (c *Connection) Query(query map[string]interface{}, indexList []string, typeList []string, httpMethod string, extraArgs url.Values) (Response, error) {
+func (c *Connection) Query(query map[string]interface{}, indexList []string, typeList []string, httpMethod string, extraArgs url.Values) (*Response, error) {
 	r := Request{
 		Conn:      c,
 		Query:     query,
@@ -214,7 +236,7 @@ func (c *Connection) Query(query map[string]interface{}, indexList []string, typ
 }
 
 // Scan starts scroll over an index
-func (c *Connection) Scan(query map[string]interface{}, indexList []string, typeList []string, timeout string, size int) (Response, error) {
+func (c *Connection) Scan(query map[string]interface{}, indexList []string, typeList []string, timeout string, size int) (*Response, error) {
 	v := url.Values{}
 	v.Add("search_type", "scan")
 	v.Add("scroll", timeout)
@@ -234,7 +256,7 @@ func (c *Connection) Scan(query map[string]interface{}, indexList []string, type
 }
 
 // Scroll fetches data by scroll id
-func (c *Connection) Scroll(scrollId string, timeout string) (Response, error) {
+func (c *Connection) Scroll(scrollId string, timeout string) (*Response, error) {
 	v := url.Values{}
 	v.Add("scroll", timeout)
 
@@ -250,7 +272,7 @@ func (c *Connection) Scroll(scrollId string, timeout string) (Response, error) {
 }
 
 // Get a typed document by its id
-func (c *Connection) Get(index string, documentType string, id string, extraArgs url.Values) (Response, error) {
+func (c *Connection) Get(index string, documentType string, id string, extraArgs url.Values) (*Response, error) {
 	r := Request{
 		Conn:      c,
 		IndexList: []string{index},
@@ -265,7 +287,7 @@ func (c *Connection) Get(index string, documentType string, id string, extraArgs
 // Index indexes a Document
 // The extraArgs is a list of url.Values that you can send to elasticsearch as
 // URL arguments, for example, to control routing, ttl, version, op_type, etc.
-func (c *Connection) Index(d Document, extraArgs url.Values) (Response, error) {
+func (c *Connection) Index(d Document, extraArgs url.Values) (*Response, error) {
 	r := Request{
 		Conn:      c,
 		Query:     d.Fields,
@@ -286,7 +308,7 @@ func (c *Connection) Index(d Document, extraArgs url.Values) (Response, error) {
 // Delete deletes a Document d
 // The extraArgs is a list of url.Values that you can send to elasticsearch as
 // URL arguments, for example, to control routing.
-func (c *Connection) Delete(d Document, extraArgs url.Values) (Response, error) {
+func (c *Connection) Delete(d Document, extraArgs url.Values) (*Response, error) {
 	r := Request{
 		Conn:      c,
 		IndexList: []string{d.Index.(string)},
@@ -301,7 +323,40 @@ func (c *Connection) Delete(d Document, extraArgs url.Values) (Response, error) 
 
 // Run executes an elasticsearch Request. It converts data to Json, sends the
 // request and return the Response obtained
-func (req *Request) Run() (Response, error) {
+func (req *Request) Run() (*Response, error) {
+	body, err := req.run()
+
+	if err != nil {
+		return &Response{}, err
+	}
+
+	esResp := new(Response)
+	err = json.Unmarshal(body, &esResp)
+	if err != nil {
+		return &Response{}, err
+	}
+
+	if req.api == "_bulk" && esResp.Errors {
+		for _, item := range esResp.Items {
+			for _, i := range item {
+				if i.Error != "" {
+					return &Response{}, &SearchError{i.Error, i.Status}
+				}
+			}
+		}
+		return &Response{}, &SearchError{Msg: "Unknown error while bulk indexing"}
+	}
+
+	if esResp.Error != "" {
+		return &Response{}, &SearchError{esResp.Error, esResp.Status}
+	}
+
+	return esResp, nil
+}
+
+// run executes an elasticsearch Request. It converts data to Json, sends the
+// request and returns a string of the response.
+func (req *Request) run() ([]byte, error) {
 	postData := []byte{}
 
 	// XXX : refactor this
@@ -312,7 +367,7 @@ func (req *Request) Run() (Response, error) {
 	} else {
 		b, err := json.Marshal(req.Query)
 		if err != nil {
-			return Response{}, err
+			return nil, err
 		}
 		postData = b
 	}
@@ -321,7 +376,7 @@ func (req *Request) Run() (Response, error) {
 
 	newReq, err := http.NewRequest(req.method, req.Url(), reader)
 	if err != nil {
-		return Response{}, err
+		return nil, err
 	}
 
 	if req.method == "POST" || req.method == "PUT" {
@@ -330,42 +385,21 @@ func (req *Request) Run() (Response, error) {
 
 	resp, err := req.Conn.Client.Do(newReq)
 	if err != nil {
-		return Response{}, err
+		return nil, err
 	}
 
 	defer resp.Body.Close()
 
 	body, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		return Response{}, err
+		return nil, err
 	}
 
 	if resp.StatusCode > 201 && resp.StatusCode < 400 {
-		return Response{}, errors.New(string(body))
+		return nil, errors.New(string(body))
 	}
 
-	esResp := new(Response)
-	err = json.Unmarshal(body, &esResp)
-	if err != nil {
-		return Response{}, err
-	}
-
-	if req.api == "_bulk" && esResp.Errors {
-		for _, item := range esResp.Items {
-			for _, i := range item {
-				if i.Error != "" {
-					return Response{}, &SearchError{i.Error, i.Status}
-				}
-			}
-		}
-		return Response{}, &SearchError{Msg: "Unknown error while bulk indexing"}
-	}
-
-	if esResp.Error != "" {
-		return Response{}, &SearchError{esResp.Error, esResp.Status}
-	}
-
-	return *esResp, nil
+	return body, nil
 }
 
 // Url builds a Request for a URL

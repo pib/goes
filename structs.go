@@ -90,6 +90,19 @@ type Response struct {
 	Aggregations map[string]Aggregation `json:"aggregations,omitempty"`
 }
 
+type HealthResponse struct {
+	ClusterName         string `json:"cluster_name"`
+	Status              string `json:"status"`
+	TimedOut            bool   `json:"timed_out"`
+	NumberOfNodes       int    `json:"number_of_nodes"`
+	NumberOfDataNodes   int    `json:"number_of_data_nodes"`
+	ActivePrimaryShards int    `json:"active_primary_shards"`
+	ActiveShards        int    `json:"active_shards"`
+	RelocatingShards    int    `json:"relocating_shards"`
+	InitializingShards  int    `json:"initializing_shards"`
+	UnassignedShards    int    `json:"unassigned_shards"`
+}
+
 // Represents an aggregation from response
 type Aggregation map[string]interface{}
 
