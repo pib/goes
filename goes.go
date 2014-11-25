@@ -92,10 +92,10 @@ func (c *Connection) Stats(indexList []string, extraArgs url.Values) (*Response,
 func (c *Connection) Health(extraArgs url.Values) (*HealthResponse, error) {
 	r := Request{
 		Conn:      c,
-		IndexList: []string{"health"},
+		IndexList: []string{"_cluster"},
+		TypeList:  []string{"health"},
 		ExtraArgs: extraArgs,
 		method:    "GET",
-		api:       "_cluster",
 	}
 
 	res := &HealthResponse{}
