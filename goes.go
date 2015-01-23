@@ -41,7 +41,7 @@ func (c *Connection) WithClient(cl *http.Client) *Connection {
 }
 
 // CreateIndex creates a new index represented by a name and a mapping
-func (c *Connection) CreateIndex(name string, mapping map[string]interface{}) (*Response, error) {
+func (c *Connection) CreateIndex(name string, mapping interface{}) (*Response, error) {
 	r := Request{
 		Conn:      c,
 		Query:     mapping,
@@ -204,7 +204,7 @@ func (c *Connection) BulkSend(documents []Document) (*Response, error) {
 }
 
 // Search executes a search query against an index
-func (c *Connection) Search(query map[string]interface{}, indexList []string, typeList []string, extraArgs url.Values) (*Response, error) {
+func (c *Connection) Search(query interface{}, indexList []string, typeList []string, extraArgs url.Values) (*Response, error) {
 	r := Request{
 		Conn:      c,
 		Query:     query,
@@ -221,7 +221,7 @@ func (c *Connection) Search(query map[string]interface{}, indexList []string, ty
 //Query runs a query against an index using the provided http method.
 //This method can be used to execute a delete by query, just pass in "DELETE"
 //for the HTTP method.
-func (c *Connection) Query(query map[string]interface{}, indexList []string, typeList []string, httpMethod string, extraArgs url.Values) (*Response, error) {
+func (c *Connection) Query(query interface{}, indexList []string, typeList []string, httpMethod string, extraArgs url.Values) (*Response, error) {
 	r := Request{
 		Conn:      c,
 		Query:     query,
@@ -236,7 +236,7 @@ func (c *Connection) Query(query map[string]interface{}, indexList []string, typ
 }
 
 // Scan starts scroll over an index
-func (c *Connection) Scan(query map[string]interface{}, indexList []string, typeList []string, timeout string, size int) (*Response, error) {
+func (c *Connection) Scan(query interface{}, indexList []string, typeList []string, timeout string, size int) (*Response, error) {
 	v := url.Values{}
 	v.Add("search_type", "scan")
 	v.Add("scroll", timeout)
