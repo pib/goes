@@ -99,7 +99,7 @@ func (c *Connection) Health(extraArgs url.Values) (*HealthResponse, error) {
 	}
 
 	res := &HealthResponse{}
-	body, err := r.run()
+	body, _, err := r.run()
 	if err != nil {
 		return res, err
 	}
@@ -324,31 +324,32 @@ func (c *Connection) Delete(d Document, extraArgs url.Values) (*Response, error)
 // Run executes an elasticsearch Request. It converts data to Json, sends the
 // request and return the Response obtained
 func (req *Request) Run() (*Response, error) {
-	body, err := req.run()
+	body, statusCode, err := req.run()
 
 	if err != nil {
-		return &Response{}, err
+		return &Response{Status: statusCode}, err
 	}
 
 	esResp := new(Response)
+	esResp.Status = statusCode
 	err = json.Unmarshal(body, &esResp)
 	if err != nil {
-		return &Response{}, err
+		return &Response{Status: statusCode}, err
 	}
 
 	if req.api == "_bulk" && esResp.Errors {
 		for _, item := range esResp.Items {
 			for _, i := range item {
 				if i.Error != "" {
-					return &Response{}, &SearchError{i.Error, i.Status}
+					return &Response{Status: statusCode}, &SearchError{i.Error, i.Status}
 				}
 			}
 		}
-		return &Response{}, &SearchError{Msg: "Unknown error while bulk indexing"}
+		return &Response{Status: statusCode}, &SearchError{Msg: "Unknown error while bulk indexing"}
 	}
 
 	if esResp.Error != "" {
-		return &Response{}, &SearchError{esResp.Error, esResp.Status}
+		return &Response{Status: statusCode}, &SearchError{esResp.Error, esResp.Status}
 	}
 
 	return esResp, nil
@@ -356,7 +357,7 @@ func (req *Request) Run() (*Response, error) {
 
 // run executes an elasticsearch Request. It converts data to Json, sends the
 // request and returns a string of the response.
-func (req *Request) run() ([]byte, error) {
+func (req *Request) run() ([]byte, uint64, error) {
 	postData := []byte{}
 
 	// XXX : refactor this
@@ -367,7 +368,7 @@ func (req *Request) run() ([]byte, error) {
 	} else {
 		b, err := json.Marshal(req.Query)
 		if err != nil {
-			return nil, err
+			return nil, 0, err
 		}
 		postData = b
 	}
@@ -376,7 +377,7 @@ func (req *Request) run() ([]byte, error) {
 
 	newReq, err := http.NewRequest(req.method, req.Url(), reader)
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 
 	if req.method == "POST" || req.method == "PUT" {
@@ -385,21 +386,21 @@ func (req *Request) run() ([]byte, error) {
 
 	resp, err := req.Conn.Client.Do(newReq)
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 
 	defer resp.Body.Close()
 
 	body, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		return nil, err
+		return nil, uint64(resp.StatusCode), err
 	}
 
 	if resp.StatusCode > 201 && resp.StatusCode < 400 {
-		return nil, errors.New(string(body))
+		return nil, uint64(resp.StatusCode), errors.New(string(body))
 	}
 
-	return body, nil
+	return body, uint64(resp.StatusCode), nil
 }
 
 // Url builds a Request for a URL
