@@ -156,7 +156,7 @@ func (s *GoesTestSuite) TestDeleteIndexInexistantIndex(c *C) {
 	resp, err := conn.DeleteIndex("foobar")
 
 	c.Assert(err.Error(), Equals, "[404] IndexMissingException[[foobar] missing]")
-	c.Assert(resp, DeepEquals, &Response{})
+	c.Assert(resp, DeepEquals, &Response{Status: 404})
 }
 
 func (s *GoesTestSuite) TestDeleteIndexExistingIndex(c *C) {
@@ -171,8 +171,10 @@ func (s *GoesTestSuite) TestDeleteIndexExistingIndex(c *C) {
 	resp, err := conn.DeleteIndex(indexName)
 	c.Assert(err, IsNil)
 
-	expectedResponse := &Response{}
-	expectedResponse.Acknowledged = true
+	expectedResponse := &Response{
+		Acknowledged: true,
+		Status:       200,
+	}
 	resp.Raw = nil
 	c.Assert(resp, DeepEquals, expectedResponse)
 }
@@ -383,6 +385,7 @@ func (s *GoesTestSuite) TestIndexWithFieldsInStruct(c *C) {
 		Id:      docId,
 		Type:    docType,
 		Version: 1,
+		Status:  201,
 	}
 
 	response.Raw = nil
@@ -448,6 +451,7 @@ func (s *GoesTestSuite) TestIndexIdDefined(c *C) {
 		Id:      docId,
 		Type:    docType,
 		Version: 1,
+		Status:  201,
 	}
 
 	response.Raw = nil
@@ -519,6 +523,7 @@ func (s *GoesTestSuite) TestDelete(c *C) {
 		Id:    docId,
 		// XXX : even after a DELETE the version number seems to be incremented
 		Version: 2,
+		Status:  200,
 	}
 	response.Raw = nil
 	c.Assert(response, DeepEquals, expectedResponse)
@@ -533,6 +538,7 @@ func (s *GoesTestSuite) TestDelete(c *C) {
 		Id:    docId,
 		// XXX : even after a DELETE the version number seems to be incremented
 		Version: 3,
+		Status:  404,
 	}
 	response.Raw = nil
 	c.Assert(response, DeepEquals, expectedResponse)
@@ -593,6 +599,7 @@ func (s *GoesTestSuite) TestDeleteByQuery(c *C) {
 		Type:    "",
 		Id:      "",
 		Version: 0,
+		Status:  200,
 	}
 	response.Raw = nil
 	c.Assert(response, DeepEquals, expectedResponse)
@@ -639,6 +646,7 @@ func (s *GoesTestSuite) TestGet(c *C) {
 		Version: 1,
 		Found:   true,
 		Source:  source,
+		Status:  200,
 	}
 
 	response.Raw = nil
@@ -658,6 +666,7 @@ func (s *GoesTestSuite) TestGet(c *C) {
 		Fields: map[string]interface{}{
 			"f1": []interface{}{"foo"},
 		},
+		Status: 200,
 	}
 
 	response.Raw = nil
@@ -1147,6 +1156,7 @@ func (s *GoesTestSuite) TestUpdate(c *C) {
 		Id:      docId,
 		Type:    docType,
 		Version: 1,
+		Status:  201,
 	}
 
 	response.Raw = nil
@@ -1220,9 +1230,8 @@ func (s *GoesTestSuite) TestGetMapping(c *C) {
 		},
 	}
 
-	response, err = conn.Index(d, url.Values{})
+	response, err = conn.Index(d, url.Values{"refresh": []string{"true"}})
 	c.Assert(err, IsNil)
-	time.Sleep(200 * time.Millisecond)
 
 	response, err = conn.GetMapping([]string{docType}, []string{indexName})
 	c.Assert(err, Equals, nil)
@@ -1318,6 +1327,7 @@ func (s *GoesTestSuite) TestAddAlias(c *C) {
 		Version: 1,
 		Found:   true,
 		Source:  source,
+		Status:  200,
 	}
 
 	response.Raw = nil
