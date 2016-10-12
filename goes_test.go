@@ -154,7 +154,7 @@ func (s *GoesTestSuite) TestDeleteIndexInexistantIndex(c *C) {
 	resp, err := conn.DeleteIndex("foobar")
 
 	c.Assert(err.Error(), Equals, "[404] IndexMissingException[[foobar] missing]")
-	c.Assert(resp, DeepEquals, Response{})
+	c.Assert(*resp, DeepEquals, Response{Status: 404})
 }
 
 func (s *GoesTestSuite) TestDeleteIndexExistingIndex(c *C) {
@@ -169,9 +169,9 @@ func (s *GoesTestSuite) TestDeleteIndexExistingIndex(c *C) {
 	resp, err := conn.DeleteIndex(indexName)
 	c.Assert(err, IsNil)
 
-	expectedResponse := Response{}
+	expectedResponse := Response{Status: 200}
 	expectedResponse.Acknowledged = true
-	c.Assert(resp, DeepEquals, expectedResponse)
+	c.Assert(*resp, DeepEquals, expectedResponse)
 }
 
 func (s *GoesTestSuite) TestRefreshIndex(c *C) {
@@ -355,13 +355,14 @@ func (s *GoesTestSuite) TestIndexWithFieldsInStruct(c *C) {
 	c.Assert(err, IsNil)
 
 	expectedResponse := Response{
+		Status:  201,
 		Index:   indexName,
 		Id:      docId,
 		Type:    docType,
 		Version: 1,
 	}
 
-	c.Assert(response, DeepEquals, expectedResponse)
+	c.Assert(*response, DeepEquals, expectedResponse)
 }
 
 func (s *GoesTestSuite) TestIndexWithFieldsNotInMapOrStruct(c *C) {
@@ -419,13 +420,14 @@ func (s *GoesTestSuite) TestIndexIdDefined(c *C) {
 	c.Assert(err, IsNil)
 
 	expectedResponse := Response{
+		Status:  201,
 		Index:   indexName,
 		Id:      docId,
 		Type:    docType,
 		Version: 1,
 	}
 
-	c.Assert(response, DeepEquals, expectedResponse)
+	c.Assert(*response, DeepEquals, expectedResponse)
 }
 
 func (s *GoesTestSuite) TestIndexIdNotDefined(c *C) {
@@ -487,27 +489,29 @@ func (s *GoesTestSuite) TestDelete(c *C) {
 	c.Assert(err, IsNil)
 
 	expectedResponse := Response{
-		Found: true,
-		Index: indexName,
-		Type:  docType,
-		Id:    docId,
+		Status: 200,
+		Found:  true,
+		Index:  indexName,
+		Type:   docType,
+		Id:     docId,
 		// XXX : even after a DELETE the version number seems to be incremented
 		Version: 2,
 	}
-	c.Assert(response, DeepEquals, expectedResponse)
+	c.Assert(*response, DeepEquals, expectedResponse)
 
 	response, err = conn.Delete(d, url.Values{})
 	c.Assert(err, IsNil)
 
 	expectedResponse = Response{
-		Found: false,
-		Index: indexName,
-		Type:  docType,
-		Id:    docId,
+		Status: 404,
+		Found:  false,
+		Index:  indexName,
+		Type:   docType,
+		Id:     docId,
 		// XXX : even after a DELETE the version number seems to be incremented
 		Version: 3,
 	}
-	c.Assert(response, DeepEquals, expectedResponse)
+	c.Assert(*response, DeepEquals, expectedResponse)
 }
 
 func (s *GoesTestSuite) TestDeleteByQuery(c *C) {
@@ -560,13 +564,14 @@ func (s *GoesTestSuite) TestDeleteByQuery(c *C) {
 	c.Assert(err, IsNil)
 
 	expectedResponse := Response{
+		Status:  200,
 		Found:   false,
 		Index:   "",
 		Type:    "",
 		Id:      "",
 		Version: 0,
 	}
-	c.Assert(response, DeepEquals, expectedResponse)
+	c.Assert(*response, DeepEquals, expectedResponse)
 
 	//should be 0 docs after delete by query
 	response, err = conn.Search(query, []string{indexName}, []string{docType}, url.Values{})
@@ -604,6 +609,7 @@ func (s *GoesTestSuite) TestGet(c *C) {
 	c.Assert(err, IsNil)
 
 	expectedResponse := Response{
+		Status:  200,
 		Index:   indexName,
 		Type:    docType,
 		Id:      docId,
@@ -612,7 +618,7 @@ func (s *GoesTestSuite) TestGet(c *C) {
 		Source:  source,
 	}
 
-	c.Assert(response, DeepEquals, expectedResponse)
+	c.Assert(*response, DeepEquals, expectedResponse)
 
 	fields := make(url.Values, 1)
 	fields.Set("fields", "f1")
@@ -620,6 +626,7 @@ func (s *GoesTestSuite) TestGet(c *C) {
 	c.Assert(err, IsNil)
 
 	expectedResponse = Response{
+		Status:  200,
 		Index:   indexName,
 		Type:    docType,
 		Id:      docId,
@@ -630,7 +637,7 @@ func (s *GoesTestSuite) TestGet(c *C) {
 		},
 	}
 
-	c.Assert(response, DeepEquals, expectedResponse)
+	c.Assert(*response, DeepEquals, expectedResponse)
 }
 
 func (s *GoesTestSuite) TestSearch(c *C) {
@@ -748,7 +755,7 @@ func (s *GoesTestSuite) TestIndexStatus(c *C) {
 				"total_size_in_bytes":   float64(0),
 			},
 			Refresh: map[string]interface{}{
-				"total":                float64(1),
+				"total":                float64(0),
 				"total_time_in_millis": float64(0),
 			},
 			Flush: map[string]interface{}{
