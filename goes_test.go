@@ -834,7 +834,7 @@ func (s *GoesTestSuite) TestIndexStatus(c *C) {
 				"total_size_in_bytes":   float64(0),
 			},
 			Refresh: map[string]interface{}{
-				"total":                float64(0),
+				"total":                float64(1),
 				"total_time_in_millis": float64(0),
 			},
 			Flush: map[string]interface{}{
