@@ -303,6 +303,85 @@ func (s *GoesTestSuite) TestBulkSend(c *C) {
 	c.Assert(err, IsNil)
 }
 
+func (s *GoesTestSuite) TestBulkSendWithVersioning(c *C) {
+	indexName := "testbulksendwithversioning"
+	docType := "tweet"
+
+	tweets := []Document{
+		{
+			Id:          "123",
+			Index:       indexName,
+			Type:        docType,
+			Version:     10,
+			VersionType: "external_gt",
+			BulkCommand: BULK_COMMAND_INDEX,
+			Fields: map[string]interface{}{
+				"user":    "foo",
+				"message": "some foo message",
+			},
+		},
+
+		{
+			Id:          nil,
+			Index:       indexName,
+			Type:        docType,
+			Version:     10,
+			VersionType: "external_gt",
+			BulkCommand: BULK_COMMAND_INDEX,
+			Fields: map[string]interface{}{
+				"user":    "bar",
+				"message": "some bar message",
+			},
+		},
+	}
+
+	conn := NewConnection(ES_HOST, ES_PORT)
+
+	_, err := conn.CreateIndex(indexName, nil)
+	defer conn.DeleteIndex(indexName)
+	c.Assert(err, IsNil)
+
+	response, err := conn.BulkSend(tweets)
+	i := Item{
+		Id:      "123",
+		Type:    docType,
+		Version: 10,
+		Index:   indexName,
+		Status:  201, //201 for indexing ( https://issues.apache.org/jira/browse/CONNECTORS-634 )
+	}
+	c.Assert(response.Items[0][BULK_COMMAND_INDEX], Equals, i)
+	c.Assert(err, IsNil)
+
+	_, err = conn.RefreshIndex(indexName)
+	c.Assert(err, IsNil)
+
+	var query = map[string]interface{}{
+		"query": map[string]interface{}{
+			"match_all": map[string]interface{}{},
+		},
+	}
+
+	searchResults, err := conn.Search(query, []string{indexName}, []string{}, url.Values{})
+	c.Assert(err, IsNil)
+
+	var expectedTotal uint64 = 2
+	c.Assert(searchResults.Hits.Total, Equals, expectedTotal)
+
+	checked := 0
+	for _, hit := range searchResults.Hits.Hits {
+		if hit.Source["user"] == "foo" {
+			c.Assert(hit.Id, Equals, "123")
+			checked++
+		}
+
+		if hit.Source["user"] == "bar" {
+			c.Assert(len(hit.Id) > 0, Equals, true)
+			checked++
+		}
+	}
+	c.Assert(checked, Equals, 2)
+}
+
 func (s *GoesTestSuite) TestStats(c *C) {
 	conn := NewConnection(ES_HOST, ES_PORT)
 	indexName := "teststats"
