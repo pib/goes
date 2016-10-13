@@ -6,12 +6,11 @@ package goes_test
 
 import (
 	"fmt"
+	"github.com/pib/goes"
 	"net/http"
 	"net/url"
 	"os"
 	"time"
-
-	"github.com/belogik/goes"
 )
 
 var (

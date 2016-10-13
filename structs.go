@@ -115,6 +115,8 @@ type Document struct {
 	Index       interface{}
 	Type        string
 	Id          interface{}
+	Version     int
+	VersionType string
 	BulkCommand string
 	Fields      interface{}
 }

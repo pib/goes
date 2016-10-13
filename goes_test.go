@@ -100,7 +100,7 @@ func (s *GoesTestSuite) TestEsDown(c *C) {
 	}
 	_, err := r.Run()
 
-	c.Assert(err, ErrorMatches, "Get http://a.b.c.d:1234/i/_search:(.*)lookup a.b.c.d: no such host")
+	c.Assert(err, ErrorMatches, "Get http://a.b.c.d:1234/i/_search:(.*)lookup a.b.c.d(.*): no such host")
 }
 
 func (s *GoesTestSuite) TestRunMissingIndex(c *C) {
@@ -154,7 +154,7 @@ func (s *GoesTestSuite) TestDeleteIndexInexistantIndex(c *C) {
 	resp, err := conn.DeleteIndex("foobar")
 
 	c.Assert(err.Error(), Equals, "[404] IndexMissingException[[foobar] missing]")
-	c.Assert(resp, DeepEquals, Response{})
+	c.Assert(*resp, DeepEquals, Response{Status: 404})
 }
 
 func (s *GoesTestSuite) TestDeleteIndexExistingIndex(c *C) {
@@ -169,9 +169,9 @@ func (s *GoesTestSuite) TestDeleteIndexExistingIndex(c *C) {
 	resp, err := conn.DeleteIndex(indexName)
 	c.Assert(err, IsNil)
 
-	expectedResponse := Response{}
+	expectedResponse := Response{Status: 200}
 	expectedResponse.Acknowledged = true
-	c.Assert(resp, DeepEquals, expectedResponse)
+	c.Assert(*resp, DeepEquals, expectedResponse)
 }
 
 func (s *GoesTestSuite) TestRefreshIndex(c *C) {
@@ -303,6 +303,85 @@ func (s *GoesTestSuite) TestBulkSend(c *C) {
 	c.Assert(err, IsNil)
 }
 
+func (s *GoesTestSuite) TestBulkSendWithVersioning(c *C) {
+	indexName := "testbulksendwithversioning"
+	docType := "tweet"
+
+	tweets := []Document{
+		{
+			Id:          "123",
+			Index:       indexName,
+			Type:        docType,
+			Version:     10,
+			VersionType: "external_gt",
+			BulkCommand: BULK_COMMAND_INDEX,
+			Fields: map[string]interface{}{
+				"user":    "foo",
+				"message": "some foo message",
+			},
+		},
+
+		{
+			Id:          nil,
+			Index:       indexName,
+			Type:        docType,
+			Version:     10,
+			VersionType: "external_gt",
+			BulkCommand: BULK_COMMAND_INDEX,
+			Fields: map[string]interface{}{
+				"user":    "bar",
+				"message": "some bar message",
+			},
+		},
+	}
+
+	conn := NewConnection(ES_HOST, ES_PORT)
+
+	_, err := conn.CreateIndex(indexName, nil)
+	defer conn.DeleteIndex(indexName)
+	c.Assert(err, IsNil)
+
+	response, err := conn.BulkSend(tweets)
+	i := Item{
+		Id:      "123",
+		Type:    docType,
+		Version: 10,
+		Index:   indexName,
+		Status:  201, //201 for indexing ( https://issues.apache.org/jira/browse/CONNECTORS-634 )
+	}
+	c.Assert(response.Items[0][BULK_COMMAND_INDEX], Equals, i)
+	c.Assert(err, IsNil)
+
+	_, err = conn.RefreshIndex(indexName)
+	c.Assert(err, IsNil)
+
+	var query = map[string]interface{}{
+		"query": map[string]interface{}{
+			"match_all": map[string]interface{}{},
+		},
+	}
+
+	searchResults, err := conn.Search(query, []string{indexName}, []string{}, url.Values{})
+	c.Assert(err, IsNil)
+
+	var expectedTotal uint64 = 2
+	c.Assert(searchResults.Hits.Total, Equals, expectedTotal)
+
+	checked := 0
+	for _, hit := range searchResults.Hits.Hits {
+		if hit.Source["user"] == "foo" {
+			c.Assert(hit.Id, Equals, "123")
+			checked++
+		}
+
+		if hit.Source["user"] == "bar" {
+			c.Assert(len(hit.Id) > 0, Equals, true)
+			checked++
+		}
+	}
+	c.Assert(checked, Equals, 2)
+}
+
 func (s *GoesTestSuite) TestStats(c *C) {
 	conn := NewConnection(ES_HOST, ES_PORT)
 	indexName := "teststats"
@@ -355,13 +434,14 @@ func (s *GoesTestSuite) TestIndexWithFieldsInStruct(c *C) {
 	c.Assert(err, IsNil)
 
 	expectedResponse := Response{
+		Status:  201,
 		Index:   indexName,
 		Id:      docId,
 		Type:    docType,
 		Version: 1,
 	}
 
-	c.Assert(response, DeepEquals, expectedResponse)
+	c.Assert(*response, DeepEquals, expectedResponse)
 }
 
 func (s *GoesTestSuite) TestIndexWithFieldsNotInMapOrStruct(c *C) {
@@ -419,13 +499,14 @@ func (s *GoesTestSuite) TestIndexIdDefined(c *C) {
 	c.Assert(err, IsNil)
 
 	expectedResponse := Response{
+		Status:  201,
 		Index:   indexName,
 		Id:      docId,
 		Type:    docType,
 		Version: 1,
 	}
 
-	c.Assert(response, DeepEquals, expectedResponse)
+	c.Assert(*response, DeepEquals, expectedResponse)
 }
 
 func (s *GoesTestSuite) TestIndexIdNotDefined(c *C) {
@@ -487,27 +568,29 @@ func (s *GoesTestSuite) TestDelete(c *C) {
 	c.Assert(err, IsNil)
 
 	expectedResponse := Response{
-		Found: true,
-		Index: indexName,
-		Type:  docType,
-		Id:    docId,
+		Status: 200,
+		Found:  true,
+		Index:  indexName,
+		Type:   docType,
+		Id:     docId,
 		// XXX : even after a DELETE the version number seems to be incremented
 		Version: 2,
 	}
-	c.Assert(response, DeepEquals, expectedResponse)
+	c.Assert(*response, DeepEquals, expectedResponse)
 
 	response, err = conn.Delete(d, url.Values{})
 	c.Assert(err, IsNil)
 
 	expectedResponse = Response{
-		Found: false,
-		Index: indexName,
-		Type:  docType,
-		Id:    docId,
+		Status: 404,
+		Found:  false,
+		Index:  indexName,
+		Type:   docType,
+		Id:     docId,
 		// XXX : even after a DELETE the version number seems to be incremented
 		Version: 3,
 	}
-	c.Assert(response, DeepEquals, expectedResponse)
+	c.Assert(*response, DeepEquals, expectedResponse)
 }
 
 func (s *GoesTestSuite) TestDeleteByQuery(c *C) {
@@ -560,13 +643,14 @@ func (s *GoesTestSuite) TestDeleteByQuery(c *C) {
 	c.Assert(err, IsNil)
 
 	expectedResponse := Response{
+		Status:  200,
 		Found:   false,
 		Index:   "",
 		Type:    "",
 		Id:      "",
 		Version: 0,
 	}
-	c.Assert(response, DeepEquals, expectedResponse)
+	c.Assert(*response, DeepEquals, expectedResponse)
 
 	//should be 0 docs after delete by query
 	response, err = conn.Search(query, []string{indexName}, []string{docType}, url.Values{})
@@ -604,6 +688,7 @@ func (s *GoesTestSuite) TestGet(c *C) {
 	c.Assert(err, IsNil)
 
 	expectedResponse := Response{
+		Status:  200,
 		Index:   indexName,
 		Type:    docType,
 		Id:      docId,
@@ -612,7 +697,7 @@ func (s *GoesTestSuite) TestGet(c *C) {
 		Source:  source,
 	}
 
-	c.Assert(response, DeepEquals, expectedResponse)
+	c.Assert(*response, DeepEquals, expectedResponse)
 
 	fields := make(url.Values, 1)
 	fields.Set("fields", "f1")
@@ -620,6 +705,7 @@ func (s *GoesTestSuite) TestGet(c *C) {
 	c.Assert(err, IsNil)
 
 	expectedResponse = Response{
+		Status:  200,
 		Index:   indexName,
 		Type:    docType,
 		Id:      docId,
@@ -630,7 +716,7 @@ func (s *GoesTestSuite) TestGet(c *C) {
 		},
 	}
 
-	c.Assert(response, DeepEquals, expectedResponse)
+	c.Assert(*response, DeepEquals, expectedResponse)
 }
 
 func (s *GoesTestSuite) TestSearch(c *C) {
@@ -711,6 +797,8 @@ func (s *GoesTestSuite) TestIndexStatus(c *C) {
 
 	// gives ES some time to do its job
 	time.Sleep(1 * time.Second)
+	_, err = conn.RefreshIndex(indexName)
+	c.Assert(err, IsNil)
 
 	response, err := conn.IndexStatus([]string{"testindexstatus"})
 	c.Assert(err, IsNil)
@@ -720,9 +808,11 @@ func (s *GoesTestSuite) TestIndexStatus(c *C) {
 
 	primarySizeInBytes := response.Indices[indexName].Index["primary_size_in_bytes"].(float64)
 	sizeInBytes := response.Indices[indexName].Index["size_in_bytes"].(float64)
+	refreshTotal := response.Indices[indexName].Refresh["total"].(float64)
 
 	c.Assert(primarySizeInBytes > 0, Equals, true)
 	c.Assert(sizeInBytes > 0, Equals, true)
+	c.Assert(refreshTotal > 0, Equals, true)
 
 	expectedIndices := map[string]IndexStatus{
 		indexName: {
@@ -748,7 +838,7 @@ func (s *GoesTestSuite) TestIndexStatus(c *C) {
 				"total_size_in_bytes":   float64(0),
 			},
 			Refresh: map[string]interface{}{
-				"total":                float64(1),
+				"total":                refreshTotal,
 				"total_time_in_millis": float64(0),
 			},
 			Flush: map[string]interface{}{

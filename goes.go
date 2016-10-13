@@ -147,12 +147,17 @@ func (c *Connection) BulkSend(documents []Document) (*Response, error) {
 	i := 0
 
 	for _, doc := range documents {
+		bulkCommand := map[string]interface{}{
+			"_index": doc.Index,
+			"_type":  doc.Type,
+			"_id":    doc.Id,
+		}
+		if doc.VersionType != "" {
+			bulkCommand["_version"] = doc.Version
+			bulkCommand["_version_type"] = doc.VersionType
+		}
 		action, err := json.Marshal(map[string]interface{}{
-			doc.BulkCommand: map[string]interface{}{
-				"_index": doc.Index,
-				"_type":  doc.Type,
-				"_id":    doc.Id,
-			},
+			doc.BulkCommand: bulkCommand,
 		})
 
 		if err != nil {
