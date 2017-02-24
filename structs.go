@@ -157,12 +157,13 @@ type Shard struct {
 
 // Represent a hit returned by a search
 type Hit struct {
-	Index  string                 `json:"_index"`
-	Type   string                 `json:"_type"`
-	Id     string                 `json:"_id"`
-	Score  float64                `json:"_score"`
-	Source map[string]interface{} `json:"_source"`
-	Fields map[string]interface{} `json:"fields"`
+	Index  string                    `json:"_index"`
+	Type   string                    `json:"_type"`
+	Id     string                    `json:"_id"`
+	Score  float64                   `json:"_score"`
+	Source map[string]interface{}    `json:"_source"`
+	Fields map[string]interface{}    `json:"fields"`
+	Highlight map[string]interface{} `json:"highlight"`
 }
 
 // Represent the hits structure as returned by elasticsearch
